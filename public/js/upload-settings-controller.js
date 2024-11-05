@@ -1,3 +1,32 @@
+document.getElementById('dataset-upload-form').addEventListener('submit', function(event) {
+    event.preventDefault(); // Prevent default form submission
+    var formData = new FormData(this);
+  
+    fetch(this.action, {
+        method: 'POST',
+        body: formData
+    })
+    .then(function(response) {
+        return response.json();
+    })
+    .then(function(data) {
+        if (data.success) {
+            // Check if bullet is present in the response
+            if (data && data.bullet) {
+                // Redirect to the datascape page using the bullet as an identifier
+                window.location.replace('/datascape/' + data.bullet);
+            } else {
+                alert("An error occurred: Bullet ID is missing in the response.");
+            }
+        } else {
+            alert(data.message || "Failed to upload datascape.");
+        }
+    })
+    .catch(function(error) {
+        console.error("Error:", error);
+        alert("An error occurred. Please try again.");
+    });
+});
 
 
 // Call this somethings that is triggered when upload page is loaded
@@ -330,8 +359,13 @@ $(document).ready(function(){
 	    	cache: false,
 	    	contentType: false,
 	    	processData: false,
-	    }).success( function(data, textStatus){
-                window.location.replace( data );
+	    }).success(function(response, textStatus) {
+	        if (response && response.bullet) {
+	            window.location.replace('/datascape/' + response.bullet);
+	        } else {
+	            console.error("Bullet ID missing in response:", response);
+	            alert("An error occurred: Bullet ID is missing in the response.");
+	        }
 	    });
 	}
     });

@@ -1,58 +1,39 @@
-'use strict'
+'use strict';
 
-
-var gd = require('node-gd');
+var sharp = require('sharp');
 
 function getRandomInt(min, max) {
     return Math.floor(Math.random() * (max - min)) + min;
 }
 
-module.exports = function(path, callback){
-    
-    // Total x and y size
+module.exports = function (path, callback) {
     var imageSize = 200;
-    // Create blank new image in memory
-    gd.createTrueColor(imageSize, imageSize, function(err, img){
-	if( err ) return callback( err );
-	
-	var lines = Array( getRandomInt(7, 3) );
-	
-	img.negate();
-	
-	// o and e are undefined
-	for( var i = 0; i < lines.length; i++ ){
-	    lines[i] = Array( getRandomInt(15, 3) );
-	    
-	    for( var j = 0; j < lines[i].length; j++ ){
-		
-		lines[i][j] = {
-		    x:  getRandomInt(imageSize, 0),
-		    y: getRandomInt(imageSize, 0)
-		};
-	    };
-	};
-	
-	// The above generate a random number of lines,
-	// containing a rondom number of points,
-	// where the x y of each point is random.
-	
-	// Set background color to white
-	//img.colorAllocate(255, 255, 255);
+    var backgroundColor = { r: 255, g: 255, b: 255, alpha: 1 };
 
+    // Create a base image with a white background
+    var baseImage = sharp({
+        create: {
+            width: imageSize,
+            height: imageSize,
+            channels: 4,
+            background: backgroundColor
+        }
+    }).png();
 
-	lines.forEach( function(line){
-	// plot line with random color
-	    var color = gd.trueColor( getRandomInt(255,0),
-				      getRandomInt(255,0),
-				      getRandomInt(255,0));
-	    
-	    img.setThickness( getRandomInt(10, 5) );
-	    line.forEach( function(point){
-		img.filledEllipse( point.x, point.y, 4, 4, color );
-	    });
-	});
+    // Generate SVG for random circles to overlay on the base image
+    var lineCount = getRandomInt(3, 7);
+    var svgContent = '<svg width="' + imageSize + '" height="' + imageSize + '">';
+    for (var i = 0; i < lineCount; i++) {
+        var color = 'rgb(' + getRandomInt(0, 255) + ',' + getRandomInt(0, 255) + ',' + getRandomInt(0, 255) + ')';
+        svgContent += '<circle cx="' + getRandomInt(0, imageSize) + '" cy="' + getRandomInt(0, imageSize) + '" r="4" fill="' + color + '" />';
+    }
+    svgContent += '</svg>';
 
-	// Write image buffer to disk
-	img.savePng(path, 0, callback );
-    });
-}
+    // Apply the SVG overlay to the base image
+    baseImage
+        .composite([{ input: Buffer.from(svgContent), blend: 'over' }])
+        .toFile(path, function (err, info) {
+            if (err) return callback(err);
+            callback(null, info);
+        });
+};

@@ -4,93 +4,70 @@
   <body>
     <%- include header.ejs %>      
     <main>
-      
-      <script type="text/javascript" src="http://gabelerner.github.io/canvg/StackBlur.js"></script>
-      <script type="text/javascript" src="http://gabelerner.github.io/canvg/rgbcolor.js"></script> 
-      <script type="text/javascript" src="http://gabelerner.github.io/canvg/canvg.js"></script> 
-
+      <script src="http://gabelerner.github.io/canvg/StackBlur.js"></script>
+      <script src="http://gabelerner.github.io/canvg/rgbcolor.js"></script> 
+      <script src="http://gabelerner.github.io/canvg/canvg.js"></script> 
       <script src="/components/FileSaver/FileSaver.min.js"></script>
-      
       <script src="/components/d3/d3.min.js"></script>
       <script src="/js/legacy/pcaso-painting-service.js"></script>
       <script src="/js/comment-controller.js"></script>  
 
-
       <div class="datascape-container">
-	<div class="title center">
-	  <p>
-	    <span class="fa-3x">
-	      <%= datascape.displaySettings.title %>
-	    </span>
-	    <span class="font-size-small">by <a href="<%- datascape.links.parent %>"> <%= datascape.parent.name.first %> <%= datascape.parent.name.last %></a></span>
-	  </p>  	  
-	</div>
-	
-	<div id="loading">
-	  <h3><i class="fa fa-spinner fa-spin fa-2x"> </i> Painting data...</h3>
-	</div>
-	
-	<!-- Pcaso --> 
-	<div id="pcaso"></div>
-	<div id="pcaso-panel">
+        <div class="title center">
+          <p>
+            <span class="fa-3x"><%= datascape.displaySettings.title %></span>
+            <span class="font-size-small">
+              <%- (datascape.links && datascape.links.parent) ? 'by ' : '' %>
+              <a href="<%- (datascape.links && datascape.links.parent) ? datascape.links.parent : '#' %>">
+                <% if (datascape.parent && datascape.parent.name) { %>
+                  <%= datascape.parent.name.first ? datascape.parent.name.first : 'Unknown' %> 
+                  <%= datascape.parent.name.last ? datascape.parent.name.last : '' %>
+                <% } else { %>
+                  Unknown User
+                <% } %>
+              </a>
+            </span>
+          </p>  	  
+        </div>
 
-	  <div id="pcaso-hover">( 0, 0 )</div> 
-	  <div id="search_panel">
-	    <form name="searchform" onSubmit="return handleSearch()" >
-	      <input type="text" id="search_input" placeholder="Search" value="">
-	      <input value="Search" id="search_button" type="submit">
-	      <br>
-	      <input type="checkbox" id="search_exact_checkbox" checked><span>exact match only</span>
-	    </form>
-	    <div id="search_results"></div>
-	  </div>
-	  
-	  <br style="clear: both;">
-	  <div id="pcaso-selection" ></div>
-	  <div id="pcaso-legend" ></div> 
-	  
+        <div id="loading">
+          <h3><i class="fa fa-spinner fa-spin fa-2x"> </i> Painting data...</h3>
+        </div>
 
-
-	</div>
-		
-	<br style="clear: both;">
-	<div class="top-m-1">
-	  <p>
-	    <!-- <span>|</span> -->
-	    <i id="take-snapshot" class="fa fa-camera fa-3x datascape-icon" title="Save a snapshot of this datascape."></i>
-	    
-	    
-	    <% if (isOwner) { %> 	  
-	    <input type="checkbox" id="update-thubnail" 
-		   title="Set the current display as the datascapes's thumbnail." name="update-thumbnail">
-	    <label for="update-thumbnail" title="Set the current display as the datascapes's thumbnail.">Make thumbnail</label>
-	    
-	    <a href="<%- datascape.links.local %>/settings" >
-	      <i class="fa fa-cog fa-3x rotate-on-hover datascape-icon" style="margin-left: 0.5em"></i>
-	    </a>
-	
-	    <% } %>
-
-	    <a target="_blank" id="twitter-link"><i class="fa fa-twitter fa-3x" style="margin-left: 13em;"></i></a>
-		  
-	  </p>
-
-	</div>
-      	
-	<div style="display:none;" id="show-caption" >
-	 	  
-	  
-	</div>
-	
-	<!-- <img id="img-out"></img> -->
-	
+        <!-- Placeholder for CSV data at the bottom of the page -->
+        <div class="csv-table-section">
+          <h3>Data Preview</h3>
+          <% if (csvData && csvData.length > 0) { %>
+            <div id="csv-table-container" style="overflow-x: auto;">
+              <table border="1" cellpadding="5" cellspacing="0">
+                <thead>
+                  <tr>
+                    <% Object.keys(csvData[0]).forEach(function(key) { %>
+                      <th><%= key %></th>
+                    <% }); %>
+                  </tr>
+                </thead>
+                <tbody>
+                  <% csvData.forEach(function(row) { %>
+                    <tr>
+                      <% Object.keys(row).forEach(function(key) { %>
+                        <td><%= row[key] %></td>
+                      <% }); %>
+                    </tr>
+                  <% }); %>
+                </tbody>
+              </table>
+            </div>
+          <% } else { %>
+            <p>No data to display.</p>
+          <% } %>
+        </div>
       </div>      
-      
+
       <div class="app-content">
-	<div id="comments-container" class="jquery-comments"></div> 
+        <div id="comments-container" class="jquery-comments"></div> 
       </div>
-      
     </main>
     <%- include footer.ejs %>  
-  </body>  
+  </body>
 </html>

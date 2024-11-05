@@ -1,103 +1,121 @@
+'use strict';
 
+var FileContainer = require('../../app/models/fileContainer.js');
+var User = require('../../app/models/user.js').User;
+var fs = require('fs');
+var csv = require('csv-parser');
 
-// Call this somethings that is triggered when upload page is loaded
+module.exports = {
+    getUserFiles: function(userId, callback) {
+        console.log('Fetching files for user ID:', userId);
 
-function init() {
-    
-    // Globals
-    var user         = window.globaData.user;
-    var focusEntity  = window.globaData.focusEntity;
-    var path         = location.pathname;
-    var columnTypes  = [];
-    var file         = null;
-    var title        = null;
-    var displayLimit = 25;  
-    var page = parseInt( getUrlParameter( 'page'));
-    
-    // If not a number, default to `0`
-    if( isNaN( page ) ) page = 0;
+        User.findById(userId).exec(function(err, user) {
+            if (err) {
+                console.error('Error finding user:', err.message);
+                return callback(err);
+            }
 
-    
-    // If on first page, do not allow user to go back
-    if( page <= 0 ) $('#prev-page').attr('disabled', true);
-    
-    // Move user to next gallery page
-    $('#next-page').click(function(){
-	//	var nextPage = page +1;	
-	
-	page += 1;
+            if (!user) {
+                console.log('User not found for ID:', userId);
+                return callback(new Error('User not found'));
+            }
 
-	updateDatascapeDisplay(page);
-	
-	//Window.location.href = path +'?'+ $.param({page: nextPage});
-    });
-    
-    // Move user page a page
-    $('#prev-page').click(function(){
-	if( page <= 0 ) return;
-	
-	page -= 1;
+            console.log('User found:', user.name.first, user.name.last);
 
-	updateDatascapeDisplay(page);
-	
-	    //window.location.href = path +'?'+ $.param({page: nextPage});
-    });
-    
-    function constructDisplay(data){
-	var container   = $("#datascape-tile-preview-anchor");
-	var leftTile    = $("#tile-left");
-	var centerTile  = $("#tile-center");
-	var rightTile   = $("#tile-right");
-	
+            FileContainer.find({ 'parent.id': user._id }).limit(10).exec(function(err, files) {
+                if (err) {
+                    console.error('Error fetching files for user:', err.message);
+                    return callback(err);
+                }
 
-	function loadElement(dest, elm){
-	    dest.hide()
-		.append( buildTile( elm ) )
-		.fadeIn( 'slow');
-	}	    
-	
-	container.empty();
+                console.log('Files retrieved:', files.length > 0 ? (files.length + ' files') : 'No files found');
+                callback(null, files);
+            });
+        });
+    },
 
-	data.docs.forEach(function(tile){
-	    setTimeout( 700 );
-	    loadElement( container, tile );
-	});
-	
-	
-	$('#prev-page').attr('disabled', ( page <= 0 ) );
+    parseCsvFile: function(filePath, callback) {
+        console.log('Reading CSV file from path:', filePath);
 
+        fs.access(filePath, fs.constants.F_OK, function(err) {
+            if (err) {
+                console.error('File does not exist or is not accessible:', filePath);
+                return callback(null, []); // Return empty data
+            }
 
-	var disableNext = ( data.page === data.pages )
-	console.log(data)
-	$('#next-page').attr('disabled', disableNext);
+            var csvData = [];
+            fs.createReadStream(filePath)
+                .pipe(csv())
+                .on('data', function(row) {
+                    var rowArray = Object.values(row);
+                    csvData.push(rowArray);
+                })
+                .on('end', function() {
+                    if (csvData.length === 0) {
+                        console.warn('CSV data parsing resulted in empty data:', filePath);
+                        return callback(null, []); // Return empty data
+                    }
+                    console.log('CSV data parsing complete. Total rows parsed:', csvData.length);
+                    callback(null, csvData);
+                })
+                .on('error', function(err) {
+                    console.error('Error reading CSV file:', err.message);
+                    callback(null, []); // Return empty data on error
+                });
+        });
+    },
 
-    };
+    initGallery: function(req, res) {
+        if (!req.user || !req.user._id) {
+            console.error('No user is authenticated.');
+            return res.status(401).send('Unauthorized');
+        }
 
-    function updateDatascapeDisplay(pageNumber){
-	var request = {
-	    parentID: focusEntity._id,
-	    page:  pageNumber,
-	    limit: displayLimit
-	};
-	
-	$.ajax({
-    	    url: '/api/datascapes/paginate',
-    	    type: 'GET',
-    	    dataType: 'json',	
-    	    cache: false,
-    	    data: request
-	}).success(function(data){
-    	    constructDisplay( data );
-	    console.log(data.docs.length * data.offset >= data.total, data.docs.length, data.offset)
-	}).error(function(err){
-    	    console.log(err);
-	});
-    };
-    
-    
-    updateDatascapeDisplay( page ); 
+        var userId = req.user._id;
+        var self = this;
 
+        self.getUserFiles(userId, function(err, files) {
+            if (err) {
+                console.error('Error retrieving user files:', err.message);
+                return res.status(500).send('Internal server error');
+            }
 
-}
+            var processedFiles = [];
+            var processedCount = 0;
 
-document.addEventListener("DOMContentLoaded", init);
+            if (files.length === 0) {
+                console.log('No files to process.');
+                return res.render('gallery', {
+                    user: req.user,
+                    files: processedFiles // Empty array if no files
+                });
+            }
+
+            files.forEach(function(file) {
+                var filePath = file.file.path;
+
+                self.parseCsvFile(filePath, function(err, csvData) {
+                    processedCount++;
+                    if (csvData.length > 0) {
+                        file.csvData = csvData.slice(0, 10); // Limit to 10 rows
+                        processedFiles.push(file);
+                    } else {
+                        console.warn('Error or no data for file:', file.file.name);
+                    }
+
+                    if (processedCount === files.length) {
+                        console.log('Processed files sent to the frontend:', processedFiles);
+                        res.render('gallery', {
+                            user: req.user,
+                            files: processedFiles
+                        });
+                    }
+                });
+            });
+        });
+    }
+};
+
+module.exports.initGallery = module.exports.initGallery;
+module.exports.getUserFiles = module.exports.getUserFiles;
+module.exports.parseCsvFile = module.exports.parseCsvFile;

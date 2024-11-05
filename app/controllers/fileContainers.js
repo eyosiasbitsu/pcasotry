@@ -1,5 +1,3 @@
-'user strict'
-
 var formidable           = require('formidable');
 var mongoose             = require('mongoose');
 var grid                 = require('gridfs-stream');
@@ -9,7 +7,6 @@ var multipart            = require('multipart');
 var Promise              = require('bluebird');
 var config               = require('../../config/config');
 var mailer               = require('../../config/mailer');
-
 
 // Load other models
 var Users          = mongoose.model('User');
@@ -92,38 +89,36 @@ exports.requestAccess = function(req, res){
     });
 };
 
-//http://10.1.0.117:3000/user/username.cool/datascapes/6qh4c0418aor
-exports.displayDatascape = function(req, res, next){
-    
-    var query = req.params.bullet ?
-	{
-	    'links.bullet': req.params.bullet
-	} : {
-	    'parent.id': req.params.userID,
-	    'links.bullet': req.params.datascape 
-	};
-    
-    FileContainers.findOne( query, function(err, doc){
-	if( err ) {
-	    res.render('500.ejs', {user: req.user});
-	    throw new Error( err );
-	}
-	
-	if( !doc ) return res.render('404.ejs', {user: req.user});
-	
-	var isOwner = req.isAuthenticated() && req.user && req.user._id.toString() === doc.parent.id;	
+// In controllers/fileContainers.js
+exports.displayDatascape = function(req, res) {
+    var query = req.params.datascape
+        ? { 'parent.id': req.params.userID, 'links.bullet': req.params.datascape }
+        : { 'links.bullet': req.params.bullet };
 
-    	if( doc.viewableTo( req.user ) ){ 
-    	    res.render( 'datascape.ejs', { user: req.user, datascape: doc, isOwner: isOwner });
-    	} else {
-    	    res.render( 'request-access.ejs', {
-    		user: req.user,
-    		datascape: doc
-    	    });
-    	}
+    FileContainers.findOne(query, function(err, doc) {
+        if (err) {
+            console.error("Error retrieving datascape:", err);
+            return res.render('500.ejs', { user: req.user });
+        }
+
+        if (!doc) {
+            console.warn("Datascape not found with query:", query);
+            return res.render('404.ejs', { user: req.user });
+        }
+
+        // Ensure parent and name properties exist to avoid undefined errors in the view
+        doc.parent = doc.parent || {};  // Ensure parent is defined
+        doc.parent.name = doc.parent.name || { first: 'Unknown', last: 'User' };  // Default values if name is missing
+
+        var isOwner = req.isAuthenticated() && req.user && req.user._id.toString() === doc.parent.id;
+
+        if (doc.viewableTo(req.user)) {
+            res.render('datascape.ejs', { user: req.user, datascape: doc, isOwner: isOwner });
+        } else {
+            res.render('request-access.ejs', { user: req.user, datascape: doc });
+        }
     });
-}
-
+};
 
 //http://10.1.0.117:3000/u/USER-ID/datascapes/6qh4c0418aor
 exports.datascapeGetCSV = function(req, res){
@@ -250,7 +245,6 @@ exports.getFileContainer = function(req, res){
     
 }
 
-
 exports.getFileContainerSource = function(req, res){
     
     // Construct query
@@ -283,7 +277,7 @@ exports.postDatascapeSettings = function(req, res){
     form.parse(req, function(err, fields) {
 	if (err){
 	    res.status(500).send({err: "Server error"});
-	    throw new Error( err );
+	    console.log("Error in form.parse controllers/fileContaine line 279");
 	}
 	
 	var settings = JSON.parse( fields.revertUponArival );
@@ -293,8 +287,8 @@ exports.postDatascapeSettings = function(req, res){
 	
 	FileContainers.findOne( query, function(fcErr, doc){
 	    if( fcErr ){
-		res.status(500).send({err: "Server error"});
-		throw new Error( fcErr );
+			res.status(500).send({err: "Server error"});
+			console.log("Error in finding a file contrainer controllers/fileContaine line 290");
 	    }
 
 	    // Make sure the user exists and they are the parent 
@@ -304,7 +298,7 @@ exports.postDatascapeSettings = function(req, res){
 	    doc.updateSettings( settings, function(updateErr){
 		if( updateErr ) {
 		    res.status(500).send({err: "Server error"});
-		    throw new Error( updateErr );
+		    console.log("Error in updatesettings controllers/fileContaine line 300");
 		}	
 	    });
 	    
@@ -318,7 +312,6 @@ exports.postDatascapeSettings = function(req, res){
 	});
     });
 }
-
 
 exports.deleteDatascape = function(req, res){
 
@@ -353,44 +346,109 @@ exports.deleteDatascape = function(req, res){
     });
 }
 
-exports.getPaginatedFiles = function(req, res){
+exports.getPaginatedFiles = function(req, res) {
     
-    // Not need to authenticate, only public datascapes 
-    // will be shows
-    
-    // Defualt to only searching for public datascapes
+    // Default to only searching for public datascapes
     var query = {
-	'$or': [ 
-	    {'displaySettings.visibility': 'PUBLIC' }
-	]
+        '$or': [ 
+            {'displaySettings.visibility': 'PUBLIC' }
+        ]
     };
     
-    // If given a parentID, only search datascapes
-    // that are owned by that user
-    if( req.query.parentID ){
-	query['parent.id'] = req.query.parentID;
-    }	    
+    // If given a parentID, only search datascapes that are owned by that user
+    if (req.query.parentID) {
+        query['parent.id'] = req.query.parentID;
+    }     
     
     // If parent, display all datascapes
-    if( req.user && ( req.query.parentID === req.user._id.toString() ) ){
-	query['$or'].push( {'displaySettings.visibility': 'PRIVATE' } );
+    if (req.user && ( req.query.parentID === req.user._id.toString() )) {
+        query['$or'].push( {'displaySettings.visibility': 'PRIVATE' } );
     }
 
+    // Retrieve all data matching the query for inspection
+    FileContainers.find(query).lean().exec(function(err, allData) {
+        if (err) {
+            console.error("Error retrieving all data:", err);
+        } else {
+            console.log("All Data Retrieved:", allData);
+
+            if (allData && allData.length > 0) {
+                console.log("Document Structure Overview:");
+                console.log(getStructureOverview(allData[0], 0));  // Start indent at 0 here
+            } else {
+                console.log("No documents found for the given query.");
+            }
+        }
+    });
+
+    // Print all collections in the database
+    mongoose.connection.db.listCollections().toArray(function(err, collections) {
+        if (err) {
+            console.error("Error listing collections:", err);
+        } else {
+            console.log("Collections in the database:");
+            collections.forEach(function(collection) {
+                console.log("- " + collection.name);
+            });
+
+            // Retrieve all users and print usernames and (hashed) passwords
+            mongoose.model('User').find({}, 'email password').lean().exec(function(err, users) {
+                if (err) {
+                    console.error("Error retrieving users:", err);
+                } else {
+                    console.log("User Emails and Passwords:");
+                    console.log(JSON.stringify(users, null, 2));  // Print as JSON
+                }
+            });
+        }
+    });
+
+    // Print the current database connection string
+    console.log("Database Connection String:", mongoose.connection._connectionString || mongoose.connection.client.s.url);
+
+    // Create a new user using the register method
+    var User = mongoose.model('User');
+    var newUser = User.register("Fitsum", "Abyu", "fitsumabyu914@gmail.com", "123123");
+
+    newUser.save(function(err) {
+        if (err) {
+            console.error("Error creating new user:", err);
+        } else {
+            console.log("New User Created:", newUser);
+        }
+    });
+
     // Construct paginate params
-    // Don't forget to parse all incoming integer values
     var paginateParams = {
-	page: parseInt( req.query.page || 0 ) + 1,
-	limit: parseInt( req.query.limit || 30 ),
-	lean: true,
-	leanWithId: true,
-	sort: { dateAdded: -1 }	 // Sort from newest to oldest 
+        page: parseInt(req.query.page || 0) + 1,
+        limit: parseInt(req.query.limit || 30),
+        lean: true,
+        leanWithId: true,
+        sort: { dateAdded: -1 } // Sort from newest to oldest 
     };
 
-    FileContainers.paginate(query, paginateParams, function(err, docs){
-	if( err ) res.send( err ); 
-	res.send( docs ); 
+    // Perform pagination and send the response
+    FileContainers.paginate(query, paginateParams, function(err, docs) {
+        if (err) return res.send(err);
+        res.send(docs); 
     });    
-} 
+
+    // Helper function to print structure overview
+    function getStructureOverview(obj, indent) {
+        var structure = '';
+        for (var key in obj) {
+            if (obj.hasOwnProperty(key)) {
+                if (typeof obj[key] === 'object' && obj[key] !== null) {
+                    structure += ' '.repeat(indent) + key + ':\n';
+                    structure += getStructureOverview(obj[key], indent + 2);
+                } else {
+                    structure += ' '.repeat(indent) + key + ' - ' + typeof obj[key] + '\n';
+                }
+            }
+        }
+        return structure;
+    }
+}
 
 
 exports.addSharedUser = function(req, res){
@@ -447,7 +505,6 @@ exports.addSharedUser = function(req, res){
 	});
     });
 }
-
 
 exports.updateThumbnail = function(req, res){
 
