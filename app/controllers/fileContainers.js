@@ -7,6 +7,7 @@ var multipart            = require('multipart');
 var Promise              = require('bluebird');
 var config               = require('../../config/config');
 var mailer               = require('../../config/mailer');
+const path = require('path');
 
 // Load other models
 var Users          = mongoose.model('User');
@@ -121,61 +122,112 @@ exports.displayDatascape = function(req, res) {
 };
 
 //http://10.1.0.117:3000/u/USER-ID/datascapes/6qh4c0418aor
-exports.datascapeGetCSV = function(req, res){
-    
-    var query = req.params.bullet ?
-	{
-	    'links.bullet': req.params.bullet
-	} : {
-	    'parent.id': req.params.userID,
-	    'links.bullet': req.params.datascape 
-	};
+exports.datascapeGetCSV = function(req, res) {
+    const query = req.params.bullet
+        ? { 'links.bullet': req.params.bullet }
+        : { 'parent.id': req.params.userID, 'links.bullet': req.params.datascape };
+		var filePath = ""
+		var name =""
 
-    FileContainers.findOne( query, function(err, doc){
-	if( err){
-	    res.status(500).send({err: "Server error"});
-	    throw new Error( err );
-	}
-	
-	if( !doc ) return res.status(404).send({err: "File not found"});
-	
-	if( doc.viewableTo( req.user ) ){ 
-	    doc.getFile( res );
-	    doc.save(function(saveErr){
-		if( saveErr ){
-		    throw new Error( saveError );
-		}
-	    });
-	} else {
-	    res.status(404).send({err: "File not found"});
-	}
-    });
-}
+    FileContainers.findOne(query, function(err, doc) {
+        if (err) {
+            console.error("Error fetching file container:", err.message);
+            return res.status(500).send({ err: "Server error" });
+        }
 
-exports.datascapeGetLegacyConfig = function(req, res){
-    
-    var query = req.params.bullet ? {
-	    'links.bullet': req.params.bullet
-	} : {
-	    'parent.id': req.params.userID,
-	    'links.bullet': req.params.datascape 
-	};
-    
-    FileContainers.findOne( query, function(err, doc){
-	if( err ){
-	    res.status(500).send({err: "Server error"});
-	    throw new Error( err );
-	}
-	
-	if( !doc ) return res.status(404).send({err: "File not found"});
-	
-	if( doc.viewableTo( req.user ) ){ 
-	    res.send( doc.displaySettings.legacy );
-	} else {
-	    res.status(404).send({err: "File not found"});
-	}
+        if (!doc) {
+            console.warn("File container not found for query:", query);
+            return res.status(404).send({ err: "File not found" });
+        }
+
+        // Check if the document is viewable to the user
+        if (!doc.viewableTo(req.user)) {
+            console.warn("User does not have access to view this file.");
+            return res.status(403).send({ err: "Access denied" });
+        }
+
+        // Use the file path from the document's `file.path`
+        filePath = doc.file?.path;
+		name= doc.file?.name
+		fs.access(filePath, fs.constants.F_OK, (err) => {
+			if (err) {
+			  console.error("File not found:", err);
+			  return res.status(404).send({ err: "File not found" });
+			}
+		
+			// Set headers to indicate file type
+			res.writeHead(200, {
+			  "Content-Type": "text/csv",
+			  "Content-Disposition": `attachment; filename="data.csv"`,
+			});
+		
+			// Create a readable stream and pipe it to the response
+			const readStream = fs.createReadStream(filePath);
+			readStream.pipe(res);
+		
+			// Handle any errors that occur during streaming
+			readStream.on("error", (streamErr) => {
+			  console.error("Error reading the file:", streamErr);
+			  res.status(500).send({ err: "Unable to send the file" });
+			});
+		  });
     });
-}
+};
+
+exports.datascapeGetLegacyConfig = function (req, res) {
+	const defaultLegacyConfig = {
+	  "fields-pca": [5, 6, 7, 8],
+	  "fields-meta": [1, 2, 3, 4],
+	  "fields-meta-id": [],
+	  "omit": [],
+	  "caption": "Default caption",
+	};
+  
+	const query = req.params.bullet
+	  ? { "links.bullet": req.params.bullet }
+	  : {
+		  "parent.id": req.params.userID,
+		  "links.bullet": req.params.datascape,
+		};
+  
+	FileContainers.findOne(query, function (err, doc) {
+	  if (err) {
+		console.error("Error finding document:", err);
+		return res.status(500).send({ err: "Server error" });
+	  }
+  
+	  if (!doc) {
+		return res.status(404).send({ err: "File not found" });
+	  }
+  
+	  if (!doc.viewableTo(req.user)) {
+		return res.status(404).send({ err: "File not found" });
+	  }
+  
+	  // Check if legacy config is empty
+	  if (!doc.displaySettings.legacy || Object.keys(doc.displaySettings.legacy).length === 0) {
+		console.log("Empty legacy configuration found, assigning default configuration.");
+  
+		// Assign default legacy config
+		doc.displaySettings.legacy = defaultLegacyConfig;
+  
+		// Save the updated document
+		doc.save(function (saveErr) {
+		  if (saveErr) {
+			console.error("Error saving updated document:", saveErr);
+			return res.status(500).send({ err: "Failed to update configuration" });
+		  }
+  
+		  console.log("Default legacy configuration saved successfully.");
+		  return res.send(doc.displaySettings.legacy); // Respond with default config
+		});
+	  } else {
+		console.log("Existing legacy configuration found, sending it.");
+		return res.send(doc.displaySettings.legacy); // Respond with existing config
+	  }
+	});
+  };
+  
 
 exports.getDatascapeSettings = function(req, res){
     var query = req.params.bulletURL ? {

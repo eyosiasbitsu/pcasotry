@@ -1,4 +1,4 @@
-var focusEntity  = window.globaData.focusEntity;
+// var focusEntity  = window.globaData.focusEntity;
 
 
 $(function(){
@@ -6,7 +6,7 @@ $(function(){
     // Twitter link
     var twitterLink = $("#twitter-link");
     var twitterLinkBody = {
-	url: "http://pcaso.io/" + focusEntity.links.bullet,
+	// url: "http://pcaso.io/" + focusEntity.links.bullet,
 	text: "Explore this datascape with me: ",
 	hashtags: "Pcaso" // Comma separated, NO SPACES....
     }
@@ -54,7 +54,7 @@ $(function(){
 	// Separate button was recommended
 	if( $('#update-thubnail').is(':checked') ){
 	    var thumbnailData = {
-		'datascapeID': focusEntity._id,
+		'datascapeID':" focusEntity._id",
 		'rawImageData': dataURL
 	    };
 	 
@@ -71,7 +71,7 @@ $(function(){
 	}
 	
 	var blob = new Blob([asArray.buffer], {type: 'image/png'});
-        saveAs(blob,  focusEntity.displaySettings.title+ '.png');
+        saveAs(blob,  "some"+ '.png');
 	
     });
     
@@ -247,9 +247,8 @@ $(function(){
 		
 		return selectBtns
 	    });
-	
-	
 	$.get( filePath + '/config', function(config){
+		console.log(config)
 	    if(config){
 		//config = JSON.parse(config)
 
@@ -334,8 +333,8 @@ $(function(){
 	point_size = 2;// _c['pt_size']+parseInt(5/Math.log(data.length));
 
 	// Show caption
-	document.getElementById('show-caption').style.display = "block"
-	document.getElementById("show-caption").innerHTML = _c["caption"]
+	// document.getElementById('show-caption').style.display = "block"
+	// document.getElementById("show-caption").innerHTML = _c["caption"]
 
 
 	// Dynamic app settings

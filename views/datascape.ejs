@@ -1,30 +1,59 @@
 <!doctype html>
 <html>
+
   <%- include head.ejs %>  
   <body>
     <%- include header.ejs %>      
     <main>
-      <script src="http://gabelerner.github.io/canvg/StackBlur.js"></script>
-      <script src="http://gabelerner.github.io/canvg/rgbcolor.js"></script> 
-      <script src="http://gabelerner.github.io/canvg/canvg.js"></script> 
-      <script src="/components/FileSaver/FileSaver.min.js"></script>
-      <script src="/components/d3/d3.min.js"></script>
+      <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+      <script src="https://d3js.org/d3.v3.min.js"></script>
       <script src="/js/legacy/pcaso-painting-service.js"></script>
-      <script src="/js/comment-controller.js"></script>  
+      <!-- <script src="/js/comment-controller.js"></script>   -->
 
+     <style>
+      /* Add any custom styles here */
+      .frame {
+          stroke: #ccc;
+          fill: none;
+      }
+  </style>
+    
+      
+    <div id="pcaso"></div>
+    <div id="pcaso-panel">
+  
+      <div id="pcaso-hover">( 0, 0 )</div> 
+      <div id="search_panel">
+        <form name="searchform" onSubmit="return handleSearch()" >
+          <input type="text" id="search_input" placeholder="Search" value="">
+          <input value="Search" id="search_button" type="submit">
+          <br>
+          <input type="checkbox" id="search_exact_checkbox" checked><span>exact match only</span>
+        </form>
+        <div id="search_results"></div>
+      </div>
+      
+      <br style="clear: both;">
+      <div id="pcaso-selection" ></div>
+      <div id="pcaso-legend" ></div> 
+      
+  
+  
+    </div>
       <div class="datascape-container">
+        
         <div class="title center">
           <p>
             <span class="fa-3x"><%= datascape.displaySettings.title %></span>
             <span class="font-size-small">
               <%- (datascape.links && datascape.links.parent) ? 'by ' : '' %>
               <a href="<%- (datascape.links && datascape.links.parent) ? datascape.links.parent : '#' %>">
-                <% if (datascape.parent && datascape.parent.name) { %>
+                <!-- <% if (datascape.parent && datascape.parent.name) { %>
                   <%= datascape.parent.name.first ? datascape.parent.name.first : 'Unknown' %> 
                   <%= datascape.parent.name.last ? datascape.parent.name.last : '' %>
                 <% } else { %>
                   Unknown User
-                <% } %>
+                <% } %> -->
               </a>
             </span>
           </p>  	  
@@ -35,39 +64,14 @@
         </div>
 
         <!-- Placeholder for CSV data at the bottom of the page -->
-        <div class="csv-table-section">
-          <h3>Data Preview</h3>
-          <% if (csvData && csvData.length > 0) { %>
-            <div id="csv-table-container" style="overflow-x: auto;">
-              <table border="1" cellpadding="5" cellspacing="0">
-                <thead>
-                  <tr>
-                    <% Object.keys(csvData[0]).forEach(function(key) { %>
-                      <th><%= key %></th>
-                    <% }); %>
-                  </tr>
-                </thead>
-                <tbody>
-                  <% csvData.forEach(function(row) { %>
-                    <tr>
-                      <% Object.keys(row).forEach(function(key) { %>
-                        <td><%= row[key] %></td>
-                      <% }); %>
-                    </tr>
-                  <% }); %>
-                </tbody>
-              </table>
-            </div>
-          <% } else { %>
-            <p>No data to display.</p>
-          <% } %>
-        </div>
+        
+        <div style="display:none;" id="show-caption" ></div>
       </div>      
 
       <div class="app-content">
         <div id="comments-container" class="jquery-comments"></div> 
       </div>
     </main>
-    <%- include footer.ejs %>  
+
   </body>
 </html>

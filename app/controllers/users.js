@@ -169,11 +169,14 @@ exports.authenticateAccount = function(req, res) {
     });
 };
 
-exports.createDataset = function(req, res) {
+ // Ensure this is imported at the top of your file
+ // Ensure you have installed this package
+
+ exports.createDataset = function (req, res) {
     console.log("Starting to process the form submission for Paint Datascape...");
     var form = new formidable.IncomingForm();
 
-    form.parse(req, function(err, fields, files) {
+    form.parse(req, function (err, fields, files) {
         if (err) {
             console.error("Error parsing form:", err.message);
             return res.status(500).json({ success: false, message: "Server error" });
@@ -185,15 +188,58 @@ exports.createDataset = function(req, res) {
             return res.status(400).json({ success: false, message: "Please upload a .csv file" });
         }
 
+        // Default legacy config
+        const defaultLegacyConfig = {
+            "fields-pca": [],
+            "fields-meta": [],
+            "fields-meta-id": [],
+            "omit": [],
+            "caption": fields.displaySettings?.caption || "Default caption"
+        };
+
+        // Parse `revertUponArival` to get `columnTypes`
+        let revertUponArival;
+        try {
+            revertUponArival = JSON.parse(fields.revertUponArival);
+        } catch (parseError) {
+            console.error("Error parsing revertUponArival JSON:", parseError.message);
+            return res.status(400).json({ success: false, message: "Invalid data format" });
+        }
+
+        const columnTypes = revertUponArival.displaySettings.display.columnTypes;
+
+        // Map column types to legacy config
+        columnTypes.forEach((type, index) => {
+            switch (type) {
+                case "omit":
+                    defaultLegacyConfig.omit.push(index + 1); // Store 1-based index
+                    break;
+                case "meta":
+                    defaultLegacyConfig["fields-meta"].push(index + 1);
+                    break;
+                case "id":
+                    defaultLegacyConfig["fields-meta-id"].push(index + 1);
+                    break;
+                case "axis":
+                    defaultLegacyConfig["fields-pca"].push(index + 1);
+                    break;
+                default:
+                    break; // Ignore any unexpected types
+            }
+        });
+
+        // Prepare settings, including the legacy configuration
         var settings = {
             displaySettings: {
                 title: fields.title || 'Untitled Datascape',
                 visibility: fields.privacySettings || 'PUBLIC',
+                legacy: defaultLegacyConfig // Add the legacy configuration here
             },
             fileOptions: { keepFile: true }
         };
 
-        req.user.registerFile(file, settings, function(err, registeredFile) {
+        // Register the file with the user and process CSV data
+        req.user.registerFile(file, settings, function (err, registeredFile) {
             if (err) {
                 console.error("Error registering file:", err.message);
                 return res.status(500).json({ success: false, message: "Failed to register file" });
@@ -202,42 +248,34 @@ exports.createDataset = function(req, res) {
             var csvData = [];
             fs.createReadStream(file.path)
                 .pipe(csv())
-                .on('data', function(row) {
+                .on('data', function (row) {
                     var rowArray = Object.values(row);
                     csvData.push(rowArray);
                 })
-                .on('end', function() {
+                .on('end', function () {
                     console.log('CSV data parsing complete. Total rows parsed:', csvData.length);
-                    csvData = csvData.slice(0, 10); // Limit to 10 rows if necessary
 
-                    res.render('datascape', {
+                    // Respond with JSON instead of rendering
+                    return res.status(200).json({
+                        success: true,
+                        message: "Datascape created successfully.",
+                        bullet: registeredFile.links.bullet,
+                        csvPreview: csvData.slice(0, 10), // Optional: send a preview of the data
                         datascape: {
                             displaySettings: settings.displaySettings,
                             links: registeredFile.links,
-                            parent: req.user && req.user.name ? {
-                                name: {
-                                    first: req.user.name.first || 'Unknown',
-                                    last: req.user.name.last || 'User'
-                                }
+                            parent: req.user ? {
+                                firstName: req.user.name?.first || 'Unknown',
+                                lastName: req.user.name?.last || 'User'
                             } : null
-                        },
-                        csvData: csvData
+                        }
                     });
                 })
-                .on('error', function(error) {
+                .on('error', function (error) {
                     console.error("Error parsing CSV file:", error.message);
-                    res.render('datascape', {
-                        datascape: {
-                            displaySettings: settings.displaySettings,
-                            links: registeredFile.links,
-                            parent: req.user && req.user.name ? {
-                                name: {
-                                    first: req.user.name.first || 'Unknown',
-                                    last: req.user.name.last || 'User'
-                                }
-                            } : null
-                        },
-                        csvData: [] // Empty data if there's an error
+                    return res.status(500).json({
+                        success: false,
+                        message: "Error parsing CSV file."
                     });
                 });
         });

@@ -20,5 +20,5 @@ data/temp/*
 public/users-public-data/*
 public/components/*
 
-config/secrets.js
-config/auth.js
+# config/secrets.js
+# config/auth.js

@@ -73,6 +73,9 @@ module.exports = function(app, passport) {
     });
     
     app.post(   '/upload-datascape',        users.createDataset);
+    app.get('/datascape/:bullet/csv', files.datascapeGetCSV);
+    app.get('/datascape/:bullet/config', files.datascapeGetLegacyConfig);
+
 
     app.get(    '/notifications',           users.getNotifications);
     app.get(    '/notifications/:notificationID', notifications.redirect );

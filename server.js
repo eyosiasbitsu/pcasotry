@@ -49,7 +49,7 @@ app.set('view engine', 'ejs');                           // set up ejs for templ
 // required for passport
 app.use(session({ 
     secret: config.secrets.sessionKey,
-    name: 'Cool Cookie',
+    name: 'CoolCookie',
     resave: true,
     saveUninitialized: true,
     store: new MongoStore( { mongooseConnection: mongoose.connection }, function(err){
